@@ -10,7 +10,11 @@
   },
   "dependencies": {
     "@clerk/nextjs": "^6.33.3",
+    "axios": "^1.12.2",
+    "cloudinary": "^2.7.0",
+    "formidable": "^3.5.4",
     "inngest": "^3.44.2",
+    "jsonwebtoken": "^9.0.2",
     "lucide-react": "^0.545.0",
     "mongoose": "^8.19.1",
     "next": "^15.5.4",

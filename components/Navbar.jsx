@@ -11,6 +11,11 @@ const Navbar = () => {
   const { isSeller, router, user } = useAppContext();
   const { openSignIn } = useClerk();
 
+  // ✅ Debug logs
+  console.log("🖥️ Navbar render:");
+  console.log("   user:", user);
+  console.log("   isSeller:", isSeller);
+
   return (
     <nav className="flex items-center justify-between px-6 md:px-16 lg:px-32 py-3 border-b border-gray-300 text-gray-700">
       {/* Logo */}
@@ -36,13 +41,15 @@ const Navbar = () => {
           Contact
         </Link>
 
-        {isSeller && (
+        {isSeller ? (
           <button
             onClick={() => router.push("/seller")}
             className="text-xs border px-4 py-1.5 rounded-full"
           >
             Seller Dashboard
           </button>
+        ) : (
+          console.log("⚠️ Not a seller, hiding Seller Dashboard button")
         )}
       </div>
 
@@ -78,12 +85,16 @@ const Navbar = () => {
                 labelIcon={<BagIcon className="w-4 h-4" />}
                 onClick={() => router.push("/my-orders")}
               />
-              {isSeller && (
+              {isSeller ? (
                 <UserButton.Action
                   label="Seller Dashboard"
                   labelIcon={<CartIcon />}
-                  onClick={() => router.push("/seller")}
+                  onClick={() => router.push("/seller/add-product")}
                 />
+              ) : (
+                console.log(
+                  "⚠️ Not a seller, hiding Seller Dashboard inside UserButton menu"
+                )
               )}
             </UserButton.MenuItems>
           </UserButton>

@@ -1,105 +1,124 @@
-'use client'
-import { productsDummyData, userDummyData } from "@/assets/assets";
-import { useUser } from "@clerk/nextjs";
-import { useRouter } from "next/navigation";
+"use client";
+
 import { createContext, useContext, useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import { useAuth, useUser } from "@clerk/nextjs";
 
-export const AppContext = createContext();
+const AppContext = createContext();
 
-export const useAppContext = () => {
-    return useContext(AppContext)
-}
+export const AppContextProvider = ({ children }) => {
+  const router = useRouter();
+  const { getToken } = useAuth();
+  const { user: clerkUser, isLoaded } = useUser();
 
-export const AppContextProvider = (props) => {
+  const [user, setUser] = useState(null);
+  const [isSeller, setIsSeller] = useState(false);
+  const [products, setProducts] = useState([]);
+  const [cart, setCart] = useState([]);
 
-    const currency = process.env.NEXT_PUBLIC_CURRENCY
-    const router = useRouter()
+ // Inside AppContextProvider
+const fetchProducts = async () => {
+  try {
+    const token = await getToken();
 
-
-    const {user} = useUser();
-
-
-    const [products, setProducts] = useState([])
-    const [userData, setUserData] = useState(false)
-    const [isSeller, setIsSeller] = useState(true)
-    const [cartItems, setCartItems] = useState({})
-
-    const fetchProductData = async () => {
-        setProducts(productsDummyData)
+    if (!token) {
+      console.warn("⚠️ No token available, cannot fetch products.");
+      return;
     }
 
-    const fetchUserData = async () => {
-        setUserData(userDummyData)
+    console.log("🔑 Token for API request:", token);
+
+    // Make sure the API route matches your backend
+    const res = await fetch("/api/product/seller-list", {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
+
+    console.log("📡 Fetch /api/product/seller-list status:", res.status);
+
+    // Parse JSON safely
+    const data = await res.json().catch(() => ({}));
+
+    if (!res.ok) {
+      console.error("❌ Failed to fetch products:", data);
+      return;
     }
 
-    const addToCart = async (itemId) => {
-
-        let cartData = structuredClone(cartItems);
-        if (cartData[itemId]) {
-            cartData[itemId] += 1;
-        }
-        else {
-            cartData[itemId] = 1;
-        }
-        setCartItems(cartData);
-
+    // Ensure data is valid
+    if (!data.success || !Array.isArray(data.products)) {
+      console.warn("⚠️ Invalid product data:", data);
+      return;
     }
 
-    const updateCartQuantity = async (itemId, quantity) => {
+    console.log("📦 Products fetched successfully:", data.products.length);
+    setProducts(data.products);
+  } catch (error) {
+    console.error("💥 Error fetching products:", error);
+  }
+};
 
-        let cartData = structuredClone(cartItems);
-        if (quantity === 0) {
-            delete cartData[itemId];
-        } else {
-            cartData[itemId] = quantity;
-        }
-        setCartItems(cartData)
 
+  // Detect Clerk user and role
+  useEffect(() => {
+    console.log("🟢 Clerk user loaded?", isLoaded, "clerkUser:", clerkUser);
+
+    if (isLoaded && clerkUser) {
+      setUser(clerkUser);
+
+      // Prefer privateMetadata.role if set, fallback to clerkUser.role, default to 'user'
+      const role =
+        clerkUser?.privateMetadata?.role ||
+        clerkUser?.publicMetadata?.role ||
+        clerkUser?.role ||
+        "user";
+
+      console.log("👤 Detected user role:", role);
+
+      setIsSeller(role === "seller");
+
+      // Fetch products only for seller
+      if (role === "seller") fetchProducts();
     }
+  }, [isLoaded, clerkUser]);
 
-    const getCartCount = () => {
-        let totalCount = 0;
-        for (const items in cartItems) {
-            if (cartItems[items] > 0) {
-                totalCount += cartItems[items];
-            }
-        }
-        return totalCount;
-    }
+  // Cart functions
+  const addToCart = (productId) => {
+    if (cart.find((item) => item._id === productId)) return;
+    const product = products.find((p) => p._id === productId);
+    if (product) setCart((prev) => [...prev, product]);
+  };
 
-    const getCartAmount = () => {
-        let totalAmount = 0;
-        for (const items in cartItems) {
-            let itemInfo = products.find((product) => product._id === items);
-            if (cartItems[items] > 0) {
-                totalAmount += itemInfo.offerPrice * cartItems[items];
-            }
-        }
-        return Math.floor(totalAmount * 100) / 100;
-    }
+  const removeFromCart = (productId) => {
+    setCart((prev) => prev.filter((item) => item._id !== productId));
+  };
 
-    useEffect(() => {
-        fetchProductData()
-    }, [])
+  console.log(
+    "🟢 Context state:",
+    "user:",
+    user ? user.email : null,
+    "isSeller:",
+    isSeller,
+    "products:",
+    products.length
+  );
 
-    useEffect(() => {
-        fetchUserData()
-    }, [])
-
-    const value = {
+  return (
+    <AppContext.Provider
+      value={{
         user,
-        currency, router,
-        isSeller, setIsSeller,
-        userData, fetchUserData,
-        products, fetchProductData,
-        cartItems, setCartItems,
-        addToCart, updateCartQuantity,
-        getCartCount, getCartAmount
-    }
+        isSeller,
+        getToken,
+        products,
+        cart,
+        addToCart,
+        removeFromCart,
+        router,
+      }}
+    >
+      {children}
+    </AppContext.Provider>
+  );
+};
 
-    return (
-        <AppContext.Provider value={value}>
-            {props.children}
-        </AppContext.Provider>
-    )
-}
+export const useAppContext = () => useContext(AppContext);
